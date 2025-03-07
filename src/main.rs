@@ -18,19 +18,23 @@ async fn main() -> Result<(), Error> {
         let db_ips = database::database::fetch_instances(&client).await?;
         println!("Found {} IPs in database", db_ips.len());
 
-        for ip in db_ips {
-            let proxy = database::database::fetch_innactive_proxies(&client, &ip).await?;
-            if proxy == "" {
+        if db_ips.is_empty() {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            continue
+        }
+        else {
+            for ip in db_ips {
                 let ip_aviso = format!("IP INATIVO EM USO: {}", ip);
                 println!("{} É IP INATIVO!", ip);
-                Notification::new()
+                if let Err(e) = Notification::new()
                     .summary("Serviço de Proxy")
                     .body(&ip_aviso)
                     .timeout(Timeout::Never)
-                    .show().unwrap();
-            } 
+                    .show() {
+                    eprintln!("Failed to show notification: {}", e);
+                }
+            }
         }
-        
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
     }
 }
