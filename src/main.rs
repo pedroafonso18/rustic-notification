@@ -1,5 +1,6 @@
 mod config;
 mod database;
+mod email;
 mod api;
 use tokio_postgres::{connect, Error};
 use notify_rust::{Notification, Timeout};
@@ -7,7 +8,7 @@ use notify_rust::{Notification, Timeout};
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     loop {
-        let (db_url, apikey) = config::config::config();
+        let (db_url, apikey, gk, mail) = config::config::config();
         let (client, connection) = connect(&db_url, tokio_postgres::NoTls).await?;
 
         tokio::spawn(async move {
@@ -41,6 +42,15 @@ async fn main() -> Result<(), Error> {
                 println!("Current wallet balance: {} {}", balance.message.current_balance, balance.message.currency);
                 
                 if balance.message.current_balance <= 100.0 {
+                    match email::email::send_mail(&mail, balance.message.current_balance, &gk).await {
+                        Ok(()) => {
+                            println!("Email Sent!");
+                        }
+                        Err(e) => {
+                            eprintln!("Email not sent: {}", e);
+                        }
+                    }
+
                     let saldo_aviso = format!("SALDO BAIXO: {}", balance.message.current_balance);
                     println!("WARNING: Low balance detected!");
                     if let Err(e) = Notification::new()
