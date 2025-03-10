@@ -8,6 +8,7 @@ A Rust application that monitors database instances and sends notifications for 
 - Monitors proxy instances
 - Sends desktop notifications for inactive proxies
 - Periodic automatic checking
+- Monitors GUPSHUP wallet ballance
 
 ## TODO
 
