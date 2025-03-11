@@ -71,8 +71,16 @@ pub struct ApiResponse {
 pub async fn get_wallet_balance(apikey: &str) -> Result<ApiResponse, ApiError> {
     let client = reqwest::Client::new();
     
-    let api_preview = if apikey.len() > 5 {
-        format!("{}...", &apikey[0..5])
+    let auth_response = client
+        .get("https://api.gupshup.io/sm/api/auth/ticket?moduleId=6&")
+        .header("apikey", apikey)
+        .send()
+        .await?;
+        
+    let token = auth_response.text().await?;
+    
+    let api_preview = if token.len() > 5 {
+        format!("{}...", &token[0..5])
     } else {
         "Invalid API key".to_string()
     };
@@ -80,7 +88,7 @@ pub async fn get_wallet_balance(apikey: &str) -> Result<ApiResponse, ApiError> {
     
     let response = client
         .get("https://webwallet.gupshup.io/WebWallet/wallet/WHATSAPP/balance?precision=4")
-        .header("authorization", apikey)
+        .header("authorization", token)
         .send()
         .await?;
     
