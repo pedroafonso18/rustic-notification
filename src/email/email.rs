@@ -2,12 +2,29 @@ use lettre::{Message, SmtpTransport, Transport};
 use lettre::transport::smtp::authentication::Credentials;
 use std::error::Error;
 
-pub async fn send_mail(email_to: &str, balance: f64, app_password: &str) -> Result<(), Box<dyn Error>> {
+
+pub enum NotificationType {
+    LowBalance(f64),   
+    LowCampaignNumbers(i64),  
+}
+
+pub async fn send_mail(email_to: &str, notification_type: NotificationType, app_password: &str) -> Result<(), Box<dyn Error>> {
+    let (subject, body) = match notification_type {
+        NotificationType::LowBalance(balance) => (
+            "LOW GUPSHUP BALANCE ALERT",
+            format!("Balanço total da GUPSHUP: {}. Favor recarregar o saldo.", balance)
+        ),
+        NotificationType::LowCampaignNumbers(remaining) => (
+            "LOW CAMPAIGN NUMBERS ALERT",
+            format!("Apenas {} números restantes na campanha ativa! Favor adicionar mais números.", remaining)
+        ),
+    };
+
     let email = Message::builder()
         .from(email_to.parse()?)
         .to(email_to.parse()?)
-        .subject("LOW BALANCE")
-        .body(format!("Balanço total da GUPSHUP: {}", balance))?;
+        .subject(subject)
+        .body(body)?;
 
     let gk = app_password.replace("_", " ");
     let creds = Credentials::new(
@@ -21,7 +38,7 @@ pub async fn send_mail(email_to: &str, balance: f64, app_password: &str) -> Resu
 
     match mailer.send(&email) {
         Ok(_) => {
-            println!("Email sent successfully!");
+            println!("Email sent successfully: {}", subject);
             Ok(())
         },
         Err(e) => {

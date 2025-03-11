@@ -4,16 +4,24 @@ mod email;
 mod api;
 use tokio_postgres::{connect, Error};
 use notify_rust::{Notification, Timeout};
+use email::email::NotificationType;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     loop {
-        let (db_url, apikey, gk, mail) = config::config::config();
+        let (db_url, apikey, gk, mail, campanhas_url) = config::config::config();
+        
         let (client, connection) = connect(&db_url, tokio_postgres::NoTls).await?;
-
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
+            eprintln!("Main database connection error: {}", e);
+            }
+        });
+        
+        let (campaigns_client, campaigns_connection) = connect(&campanhas_url, tokio_postgres::NoTls).await?;
+        tokio::spawn(async move {
+            if let Err(e) = campaigns_connection.await {
+            eprintln!("Campaigns database connection error: {}", e);
             }
         });
 
@@ -37,17 +45,46 @@ async fn main() -> Result<(), Error> {
             }
         }
 
+        let restante = database::database::fetch_campaign_left(&campaigns_client).await?;
+        println!("Found {} Numbers left in the campaign", restante);
+        
+        if restante <= 5000 {
+            let campanhas_aviso = format!("APENAS {} NÚMEROS RESTANTES NA CAMPANHA!", restante);
+            println!("WARNING: Low campaign numbers detected!");
+            
+            if let Err(e) = Notification::new()
+                .summary("Serviço de Campanhas")
+                .body(&campanhas_aviso)
+                .timeout(Timeout::Never)
+                .show() {
+                    eprintln!("Failed to show notification: {}", e);
+                }
+                
+            match email::email::send_mail(&mail, NotificationType::LowCampaignNumbers(restante), &gk).await {
+                Ok(()) => {
+                    println!("Campaign numbers email sent!");
+                }
+                Err(e) => {
+                    eprintln!("Campaign numbers email not sent: {}", e);
+                }
+            }
+        }
+
         match api::api::get_wallet_balance(&apikey).await {
             Ok(balance) => {
                 println!("Current wallet balance: {} {}", balance.message.current_balance, balance.message.currency);
                 
                 if balance.message.current_balance <= 100.0 {
-                    match email::email::send_mail(&mail, balance.message.current_balance, &gk).await {
+                    match email::email::send_mail(
+                        &mail, 
+                        NotificationType::LowBalance(balance.message.current_balance), 
+                        &gk
+                    ).await {
                         Ok(()) => {
-                            println!("Email Sent!");
+                            println!("Balance alert email sent!");
                         }
                         Err(e) => {
-                            eprintln!("Email not sent: {}", e);
+                            eprintln!("Balance alert email not sent: {}", e);
                         }
                     }
 
