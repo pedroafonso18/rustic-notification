@@ -59,6 +59,15 @@ async fn main() -> Result<(), Error> {
                 .show() {
                     eprintln!("Failed to show notification: {}", e);
                 }
+            let message = format!("Poucos números na campanha: {}!",restante);
+            match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message).await {
+                Ok(response) => {
+                    println!("Whatsapp message sent! Status: {}", response.status());
+                },
+                Err(e) => {
+                    eprintln!("Failed to send whatsapp message! Status: {}", e);
+                }
+            }
                 
             match email::email::send_mail(&env_vars.email, NotificationType::LowCampaignNumbers(restante), &env_vars.gk).await {
                 Ok(()) => {
@@ -96,6 +105,15 @@ async fn main() -> Result<(), Error> {
                             .timeout(Timeout::Never)
                             .show() {
                             eprintln!("Failed to show notification: {}", e);
+                    }
+                    let message = format!("Pouco saldo na GUPSHUP: {}!",balance.message.current_balance);
+                    match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message).await {
+                        Ok(response) => {
+                            println!("Whatsapp message sent! Status: {}", response.status());
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to send whatsapp message! Status: {}", e);
+                        }
                     }
                 }
             },

@@ -25,6 +25,12 @@ impl From<reqwest::Error> for ApiError {
     }
 }
 
+#[derive(Serialize)]
+struct WhatsappBodyRequest {
+    number: String,
+    text: String, 
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     #[serde(rename = "accountLimit")]
@@ -102,4 +108,23 @@ pub async fn get_wallet_balance(apikey: &str) -> Result<ApiResponse, ApiError> {
             Err(ApiError::JsonParseError(e.to_string()))
         }
     }
+}
+
+
+pub async fn send_whatsapp_message(evo_apikey: &str, evo_url: &str, num_send_to: &str, message: &str) -> Result<reqwest::Response, reqwest::Error> {
+    let client = reqwest::Client::new();
+
+    let payload = WhatsappBodyRequest {
+        number: num_send_to.to_string(),
+        text: message.to_string(),
+    };
+
+    let response = client
+        .post(evo_url)
+        .header("apikey", evo_apikey)
+        .json(&payload)
+        .send()
+        .await?;
+    
+    Ok(response)
 }
