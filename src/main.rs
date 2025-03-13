@@ -9,16 +9,16 @@ use email::email::NotificationType;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     loop {
-        let (db_url, apikey, gk, mail, campanhas_url) = config::config::config();
+        let env_vars = config::config::config();
         
-        let (client, connection) = connect(&db_url, tokio_postgres::NoTls).await?;
+        let (client, connection) = connect(&env_vars.db, tokio_postgres::NoTls).await?;
         tokio::spawn(async move {
             if let Err(e) = connection.await {
             eprintln!("Main database connection error: {}", e);
             }
         });
         
-        let (campaigns_client, campaigns_connection) = connect(&campanhas_url, tokio_postgres::NoTls).await?;
+        let (campaigns_client, campaigns_connection) = connect(&env_vars.campanhas_url, tokio_postgres::NoTls).await?;
         tokio::spawn(async move {
             if let Err(e) = campaigns_connection.await {
             eprintln!("Campaigns database connection error: {}", e);
@@ -60,7 +60,7 @@ async fn main() -> Result<(), Error> {
                     eprintln!("Failed to show notification: {}", e);
                 }
                 
-            match email::email::send_mail(&mail, NotificationType::LowCampaignNumbers(restante), &gk).await {
+            match email::email::send_mail(&env_vars.email, NotificationType::LowCampaignNumbers(restante), &env_vars.gk).await {
                 Ok(()) => {
                     println!("Campaign numbers email sent!");
                 }
@@ -70,15 +70,15 @@ async fn main() -> Result<(), Error> {
             }
         }
 
-        match api::api::get_wallet_balance(&apikey).await {
+        match api::api::get_wallet_balance(&env_vars.api).await {
             Ok(balance) => {
                 println!("Current wallet balance: {} {}", balance.message.current_balance, balance.message.currency);
                 
                 if balance.message.current_balance <= 100.0 {
                     match email::email::send_mail(
-                        &mail, 
+                        &env_vars.email, 
                         NotificationType::LowBalance(balance.message.current_balance), 
-                        &gk
+                        &env_vars.gk
                     ).await {
                         Ok(()) => {
                             println!("Balance alert email sent!");
