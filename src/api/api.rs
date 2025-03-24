@@ -1,5 +1,5 @@
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::fmt;
 
 #[derive(Debug)]
