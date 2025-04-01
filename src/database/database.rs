@@ -1,15 +1,5 @@
 use tokio_postgres::{Client, Error};
 
-pub async fn fetch_instances(client: &Client) -> Result<Vec<String>, Error> {
-    let rows = client.query("SELECT proxy FROM instances WHERE proxy IS NOT NULL AND proxy NOT in (SELECT ip FROM proxy)", &[]).await?;
-
-    let mut proxyvec: Vec<String> = Vec::new();
-    for row in rows {
-        let ip: &str = row.get("proxy");
-        proxyvec.push(ip.to_string());
-    }
-    Ok(proxyvec)
-}
 
 pub async fn fetch_campaign_left(client: &Client) -> Result<i64, Error> {
     let campanha_rows = client.query("SELECT nome_campanha FROM gerenciamento_campanhas WHERE ativa = TRUE LIMIT 1", &[]).await?;
@@ -25,4 +15,16 @@ pub async fn fetch_campaign_left(client: &Client) -> Result<i64, Error> {
     let contagem: i64 = contagem_rows[0].get(0);
     
     Ok(contagem)
+}
+
+pub async fn fetch_connections(client: &Client) -> Result<Vec<String>, Error> {
+    let conexoes = client.query("SELECT name FROM instances WHERE instance_id is not null", &[]).await?;
+
+    let mut conexoes_de_mafia: Vec<String> = Vec::new();
+    for conexao in conexoes {
+        conexoes_de_mafia.push(
+            conexao.get::<_, String>("name")
+        );
+    }
+    Ok(conexoes_de_mafia)
 }

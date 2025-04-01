@@ -111,7 +111,7 @@ pub async fn get_wallet_balance(apikey: &str) -> Result<ApiResponse, ApiError> {
 }
 
 
-pub async fn send_whatsapp_message(evo_apikey: &str, evo_url: &str, num_send_to: &str, message: &str) -> Result<reqwest::Response, reqwest::Error> {
+pub async fn send_whatsapp_message(evo_apikey: &str, evo_url: &str, num_send_to: &str, message: &str, possible_connections: &Vec<String>) -> Result<reqwest::Response, reqwest::Error> {
     let client = reqwest::Client::new();
 
     let payload = WhatsappBodyRequest {
@@ -119,12 +119,39 @@ pub async fn send_whatsapp_message(evo_apikey: &str, evo_url: &str, num_send_to:
         text: message.to_string(),
     };
 
-    let response = client
-        .post(evo_url)
-        .header("apikey", evo_apikey)
-        .json(&payload)
-        .send()
-        .await?;
+    for connections in possible_connections {
+        let url = format!("{}{}", evo_url, &connections);
+        let response = client
+            .post(url)
+            .header("apikey", evo_apikey)
+            .json(&payload)
+            .send()
+            .await;
+        
+        match response {
+            Ok(res) if res.status().is_success() => {
+                println!("Sucessfully sent message with connection: {}", &connections);
+                return Ok(res);
+            }
+            Ok(res) if res.status().is_client_error() || res.status().is_server_error() => {
+                continue;
+            }
+            Err(e) => {
+                return Err(e);
+            }
+            _ => continue,
+        }
+    }
     
-    Ok(response)
+    let result = client
+        .get("https://httpbin.org/400") 
+        .send()
+        .await;
+    
+    println!("No successful connection found for WhatsApp message");
+    
+    match result {
+        Err(e) => Err(e),
+        Ok(res) => res.error_for_status()
+    }
 }
