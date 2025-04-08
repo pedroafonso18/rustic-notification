@@ -30,24 +30,33 @@ async fn main() -> Result<(), Error> {
         if restante <= 5000 {
             let campanhas_aviso = format!("APENAS {} NÚMEROS RESTANTES NA CAMPANHA!", restante);
             println!("WARNING: Low campaign numbers detected! {}", campanhas_aviso);
-                            
-            let message = format!("Poucos números na campanha: {}!",restante);
-            match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message, &conexoes).await {
-                Ok(response) => {
-                    println!("Whatsapp message sent! Status: {}", response.status());
-                },
-                Err(e) => {
-                    eprintln!("Failed to send whatsapp message! Status: {}", e);
+            
+            let recent_notif = database::database::fetch_recent_logs(&client, "CAMPANHA").await?;
+            if !recent_notif {
+                let message = format!("Poucos números na campanha: {}!",restante);
+                match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message, &conexoes).await {
+                    Ok(response) => {
+                        println!("Whatsapp message sent! Status: {}", response.status());
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to send whatsapp message! Status: {}", e);
+                    }
                 }
-            }
+                    
+                match email::email::send_mail(&env_vars.email, NotificationType::LowCampaignNumbers(restante), &env_vars.gk).await {
+                    Ok(()) => {
+                        println!("Campaign numbers email sent!");
+                    }
+                    Err(e) => {
+                        eprintln!("Campaign numbers email not sent: {}", e);
+                    }
+                }
                 
-            match email::email::send_mail(&env_vars.email, NotificationType::LowCampaignNumbers(restante), &env_vars.gk).await {
-                Ok(()) => {
-                    println!("Campaign numbers email sent!");
+                if let Err(e) = database::database::insert_logs(&client, "CAMPANHA").await {
+                    eprintln!("Failed to log campaign notification: {}", e);
                 }
-                Err(e) => {
-                    eprintln!("Campaign numbers email not sent: {}", e);
-                }
+            } else {
+                println!("Campaign notification was recently sent, skipping...");
             }
         }
 
@@ -55,32 +64,40 @@ async fn main() -> Result<(), Error> {
             Ok(balance) => {
                 println!("Current wallet balance: {} {}", balance.message.current_balance, balance.message.currency);
                 
-                if balance.message.current_balance <= 200.0 {
+                if balance.message.current_balance <= 100.0 {
                     let saldo_aviso = format!("SALDO BAIXO: {}", balance.message.current_balance);
                     println!("WARNING: Low balance detected! {}", saldo_aviso);
                     
-                    
-                    match email::email::send_mail(
-                        &env_vars.email, 
-                        NotificationType::LowBalance(balance.message.current_balance), 
-                        &env_vars.gk
-                    ).await {
-                        Ok(()) => {
-                            println!("Balance alert email sent!");
+                    let recent_notif = database::database::fetch_recent_logs(&client, "SALDO").await?;
+                    if !recent_notif {
+                        match email::email::send_mail(
+                            &env_vars.email, 
+                            NotificationType::LowBalance(balance.message.current_balance), 
+                            &env_vars.gk
+                        ).await {
+                            Ok(()) => {
+                                println!("Balance alert email sent!");
+                            }
+                            Err(e) => {
+                                eprintln!("Balance alert email not sent: {}", e);
+                            }
                         }
-                        Err(e) => {
-                            eprintln!("Balance alert email not sent: {}", e);
-                        }
-                    }
 
-                    let message = format!("Pouco saldo na GUPSHUP: {}!",balance.message.current_balance);
-                    match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message, &conexoes).await {
-                        Ok(response) => {
-                            println!("Whatsapp message sent! Status: {}", response.status());
-                        },
-                        Err(e) => {
-                            eprintln!("Failed to send whatsapp message! Status: {}", e);
+                        let message = format!("Pouco saldo na GUPSHUP: {}!",balance.message.current_balance);
+                        match api::api::send_whatsapp_message(&env_vars.evo_apikey, &env_vars.evo_url, &env_vars.num_send_to, &message, &conexoes).await {
+                            Ok(response) => {
+                                println!("Whatsapp message sent! Status: {}", response.status());
+                            },
+                            Err(e) => {
+                                eprintln!("Failed to send whatsapp message! Status: {}", e);
+                            }
                         }
+                        
+                        if let Err(e) = database::database::insert_logs(&client, "SALDO").await {
+                            eprintln!("Failed to log balance notification: {}", e);
+                        }
+                    } else {
+                        println!("Balance notification was recently sent, skipping...");
                     }
                 }
             },

@@ -28,3 +28,26 @@ pub async fn fetch_connections(client: &Client) -> Result<Vec<String>, Error> {
     }
     Ok(conexoes_de_mafia)
 }
+
+pub async fn insert_logs(client: &Client, notif_type: &str) -> Result<(), Error> {
+    match client.execute("INSERT INTO logs_notif (notif_type) VALUES ($1)", &[&notif_type]).await {
+        Ok(_) => {
+            println!("Successfully inserted log!");
+            Ok(())
+        }
+        Err(e) => {
+            Err(e)
+        }
+    }
+}
+
+pub async fn fetch_recent_logs(client: &Client, notif_type: &str) -> Result<bool, Error> {
+    let rows = client.query(
+        "SELECT COUNT(*) FROM logs_notif WHERE notif_type = $1 AND horario >= NOW() - INTERVAL '5 minutes'", 
+        &[&notif_type]
+    ).await?;
+
+    let count: i64 = rows[0].get(0);
+    
+    Ok(count > 0)
+}
